@@ -142,7 +142,6 @@ describe("NewContract", function () {
 - `test:XX` - 测试命令
 - `demo:XX` - 简单演示脚本
 - `visualize:XX` - 详细可视化演示
-- `deploy:XX` - 部署脚本（可选）
 
 ## 案例说明
 
