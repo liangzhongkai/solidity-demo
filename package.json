@@ -1,0 +1,17 @@
+{
+  "name": "solidity-demo",
+  "version": "1.0.0",
+  "description": "Solidity存储机制练习：Slot Packing演示",
+  "scripts": {
+    "compile": "hardhat compile",
+    "start": "npx hardhat node",
+    "test": "hardhat test",
+    "test:01": "hardhat test test/examples/01-slot-packing/PackingChallenge.test.js",
+    "demo:01": "node scripts/examples/01-slot-packing/simple-demo.js",
+    "visualize:01": "node scripts/examples/01-slot-packing/deployment-visualizer.js"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  }
+}
