@@ -4,11 +4,13 @@
   "description": "Solidity存储机制练习：Slot Packing演示",
   "scripts": {
     "compile": "hardhat compile",
-    "start": "npx hardhat node",
+    "start": "hardhat node",
     "test": "hardhat test",
     "test:01": "hardhat test test/examples/01-slot-packing/PackingChallenge.test.js",
     "demo:01": "node scripts/examples/01-slot-packing/simple-demo.js",
-    "visualize:01": "node scripts/examples/01-slot-packing/deployment-visualizer.js"
+    "visualize:01": "node scripts/examples/01-slot-packing/deployment-visualizer.js",
+    "test:02": "hardhat test test/examples/02-erc20/ProductionERC20.test.js",
+    "demo:02": "node scripts/examples/02-erc20/deploy-demo.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
