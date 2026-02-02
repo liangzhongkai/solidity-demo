@@ -16,7 +16,9 @@
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
       "Bash(npm run test:*)",
-      "Bash(npm run compile:*)"
+      "Bash(npm run compile:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

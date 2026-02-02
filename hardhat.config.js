@@ -3,6 +3,7 @@ require("@nomicfoundation/hardhat-toolbox");
 module.exports = {
   solidity: {
     version: "0.8.20",
+    solcjs: "solc",
     settings: {
       optimizer: {
         enabled: true,

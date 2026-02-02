@@ -15,8 +15,9 @@
     "demo:02:assembly": "node scripts/examples/02-erc20/assembly-optimization-demo.js"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "hardhat": "^2.19.0",
-    "hardhat-gas-reporter": "^2.3.0"
+    "hardhat-gas-reporter": "^1.0.10",
+    "solc": "^0.8.33"
   }
 }
