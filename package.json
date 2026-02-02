@@ -10,10 +10,13 @@
     "demo:01": "node scripts/examples/01-slot-packing/simple-demo.js",
     "visualize:01": "node scripts/examples/01-slot-packing/deployment-visualizer.js",
     "test:02": "hardhat test test/examples/02-erc20/ProductionERC20.test.js",
-    "demo:02": "node scripts/examples/02-erc20/deploy-demo.js"
+    "test:02:assembly": "hardhat test test/examples/02-erc20/ProductionERC20-Assembly.test.js",
+    "demo:02": "node scripts/examples/02-erc20/deploy-demo.js",
+    "demo:02:assembly": "node scripts/examples/02-erc20/assembly-optimization-demo.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "hardhat": "^2.19.0"
+    "hardhat": "^2.19.0",
+    "hardhat-gas-reporter": "^2.3.0"
   }
 }

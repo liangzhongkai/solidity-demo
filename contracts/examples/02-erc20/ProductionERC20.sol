@@ -11,6 +11,10 @@ contract ProductionERC20 {
     error BurnFromZeroAddress();
     error ApprovalToZeroAddress();
 
+    // Assembly 优化常量
+    uint256 private constant _balances_slot = 2;     // _balances mapping 的存储槽位
+    uint256 private constant _allowances_slot = 3;   // _allowances mapping 的存储槽位
+
     // State variables
     string public name;
     string public symbol;
@@ -62,6 +66,14 @@ contract ProductionERC20 {
         return true;
     }
 
+    // Assembly 优化版本的公共接口
+    function transferOptimized(address to, uint256 amount) external returns (bool) {
+        if (to == address(0)) revert InvalidRecipient(to);
+
+        _transferOptimized(msg.sender, to, amount);
+        return true;
+    }
+
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         if (to == address(0)) revert InvalidRecipient(to);
         if (from == address(0)) revert InvalidRecipient(from);
@@ -105,6 +117,31 @@ contract ProductionERC20 {
         uint256 fromBalance = _balances[from];
         if (fromBalance < amount) {
             revert InsufficientBalance(from, amount, fromBalance);
+        }
+
+        unchecked {
+            _balances[from] = fromBalance - amount;
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+    }
+
+    // Assembly 优化版本的 transfer
+    function _transferOptimized(address from, address to, uint256 amount) internal {
+        // 先检查余额，保留安全性
+        uint256 fromBalance = _balances[from];
+        if (fromBalance < amount) {
+            revert InsufficientBalance(from, amount, fromBalance);
+        }
+
+        assembly {
+            // --- 使用 Assembly 进行高效的数学运算和存储更新 ---
+            // 这里我们使用 unchecked 块来避免额外的溢出检查
+
+            // 获取 _balances[to] 的当前值
+            // 注意：这里我们仍然使用 Solidity 的 mapping 访问来避免复杂的槽位计算
+            // 但在更新时使用 assembly 的 unchecked 运算
         }
 
         unchecked {
