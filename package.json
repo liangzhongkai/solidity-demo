@@ -1,11 +1,14 @@
 {
   "name": "solidity-demo",
   "version": "1.0.0",
-  "description": "Solidity存储机制练习：Slot Packing演示",
+  "description": "Solidity智能合约学习和测试案例集合",
   "scripts": {
     "compile": "hardhat compile",
     "start": "hardhat node",
     "test": "hardhat test",
+    "coverage": "hardhat coverage --testfiles \"test/examples/**/*.test.js\"",
+    "coverage:02": "hardhat coverage --testfiles \"test/examples/02-erc20/*.test.js\"",
+    "slither": "slither contracts/examples/02-erc20/ProductionERC20.sol",
     "scripts": "node scripts/examples/01-slot-packing/simple-demo.js && node scripts/examples/01-slot-packing/deployment-visualizer.js && node scripts/examples/02-erc20/deploy-demo.js && node scripts/examples/02-erc20/assembly-optimization-demo.js",
     "test:01": "hardhat test test/examples/01-slot-packing/PackingChallenge.test.js",
     "demo:01": "node scripts/examples/01-slot-packing/simple-demo.js",
@@ -19,6 +22,7 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "hardhat": "^2.19.0",
     "hardhat-gas-reporter": "^1.0.10",
-    "solc": "^0.8.33"
+    "solc": "^0.8.33",
+    "solidity-coverage": "^0.8.17"
   }
 }

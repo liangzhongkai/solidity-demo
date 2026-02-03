@@ -1,0 +1,14 @@
+{
+  "ignore": [
+    "node_modules",
+    "artifacts",
+    "cache",
+    "coverage"
+  ],
+  "detectors": {
+    "unused-state": {
+      "checks": ["unused-state"],
+      "severity": "Low"
+    }
+  }
+}

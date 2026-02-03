@@ -295,4 +295,119 @@ describe("ProductionERC20 - 工程化测试", function () {
       expect(gasUsed).to.be.lessThan(80000);
     });
   });
+
+  describe("8. Burn 功能测试", function () {
+    const burnAmount = ethers.parseEther("100");
+
+    beforeEach(async function () {
+      // 给 addr1 转账用于测试
+      await token.transfer(addr1.address, ethers.parseEther("1000"));
+    });
+
+    it("✅ burn - 应该成功燃烧自己的代币", async function () {
+      const initialBalance = await token.balanceOf(addr1.address);
+      const initialTotalSupply = await token.totalSupply();
+
+      await expect(token.connect(addr1).burn(burnAmount))
+        .to.emit(token, "Transfer")
+        .withArgs(addr1.address, ethers.ZeroAddress, burnAmount);
+
+      expect(await token.balanceOf(addr1.address)).to.equal(initialBalance - burnAmount);
+      expect(await token.totalSupply()).to.equal(initialTotalSupply - burnAmount);
+    });
+
+    it("❌ burn - 余额不足应该 revert", async function () {
+      const hugeAmount = ethers.parseEther("999999");
+
+      await expect(
+        token.connect(addr1).burn(hugeAmount)
+      ).to.be.revertedWithCustomError(token, "InsufficientBalance")
+        .withArgs(addr1.address, hugeAmount, ethers.parseEther("1000"));
+    });
+
+    it("✅ burn - 燃烧全部余额应该成功", async function () {
+      const balance = await token.balanceOf(addr1.address);
+      const initialTotalSupply = await token.totalSupply();
+
+      await token.connect(addr1).burn(balance);
+
+      expect(await token.balanceOf(addr1.address)).to.equal(0);
+      expect(await token.totalSupply()).to.equal(initialTotalSupply - balance);
+    });
+
+    it("✅ burn - 零值燃烧应该成功", async function () {
+      await expect(token.connect(addr1).burn(0))
+        .to.emit(token, "Transfer")
+        .withArgs(addr1.address, ethers.ZeroAddress, 0);
+    });
+
+    it("✅ burnFrom - 正常授权燃烧应该成功", async function () {
+      await token.connect(addr1).approve(owner.address, burnAmount);
+
+      const initialBalance = await token.balanceOf(addr1.address);
+      const initialTotalSupply = await token.totalSupply();
+
+      await expect(token.burnFrom(addr1.address, burnAmount))
+        .to.emit(token, "Transfer")
+        .withArgs(addr1.address, ethers.ZeroAddress, burnAmount);
+
+      expect(await token.balanceOf(addr1.address)).to.equal(initialBalance - burnAmount);
+      expect(await token.totalSupply()).to.equal(initialTotalSupply - burnAmount);
+
+      // allowance 应该被扣除
+      expect(await token.allowance(addr1.address, owner.address)).to.equal(0);
+    });
+
+    it("❌ burnFrom - allowance 不足应该 revert", async function () {
+      const smallApproval = ethers.parseEther("50");
+
+      await token.connect(addr1).approve(owner.address, smallApproval);
+
+      await expect(
+        token.burnFrom(addr1.address, burnAmount)
+      ).to.be.revertedWithCustomError(token, "InsufficientAllowance");
+    });
+
+    it("❌ burnFrom - 余额不足应该 revert", async function () {
+      const hugeAmount = ethers.parseEther("999999");
+
+      await token.connect(addr1).approve(owner.address, hugeAmount);
+
+      await expect(
+        token.burnFrom(addr1.address, hugeAmount)
+      ).to.be.revertedWithCustomError(token, "InsufficientBalance");
+    });
+
+    it("✅ burnFrom - 多次部分燃烧应该正确扣除 allowance", async function () {
+      const totalApproval = ethers.parseEther("500");
+      const firstBurn = ethers.parseEther("200");
+      const secondBurn = ethers.parseEther("100");
+
+      await token.connect(addr1).approve(owner.address, totalApproval);
+
+      await token.burnFrom(addr1.address, firstBurn);
+      expect(await token.allowance(addr1.address, owner.address)).to.equal(totalApproval - firstBurn);
+
+      await token.burnFrom(addr1.address, secondBurn);
+      expect(await token.allowance(addr1.address, owner.address)).to.equal(
+        totalApproval - firstBurn - secondBurn
+      );
+    });
+
+    it("✅ burn - 燃烧后 totalSupply 应该减少", async function () {
+      const initialSupply = await token.totalSupply();
+
+      await token.connect(addr1).burn(burnAmount);
+      await token.burn(burnAmount);
+
+      expect(await token.totalSupply()).to.equal(initialSupply - burnAmount * 2n);
+    });
+
+    it("✅ burnFrom - 零地址账户不能燃烧", async function () {
+      // 零地址的 allowance 始终为 0，所以会先触发 InsufficientAllowance
+      await expect(
+        token.burnFrom(ethers.ZeroAddress, 1)
+      ).to.be.revertedWithCustomError(token, "InsufficientAllowance");
+    });
+  });
 });

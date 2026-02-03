@@ -19,7 +19,12 @@
       "Bash(npm run compile:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(npx hardhat run:*)"
+      "Bash(npx hardhat run:*)",
+      "Bash(npx hardhat coverage:*)",
+      "Bash(pip3:*)",
+      "Bash(slither:*)",
+      "Bash(npm run slither:*)",
+      "Bash(npm run coverage:02:*)"
     ],
     "deny": [],
     "ask": []

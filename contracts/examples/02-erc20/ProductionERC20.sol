@@ -12,7 +12,7 @@ contract ProductionERC20 {
     error ApprovalToZeroAddress();
 
     // Assembly 优化常量
-    uint256 private constant _balances_slot = 3;     // _balances mapping 的存储槽位
+    uint256 private constant BALANCES_SLOT = 3;     // _balances mapping 的存储槽位
 
     // State variables
     string public name;
@@ -158,15 +158,15 @@ contract ProductionERC20 {
             // from 槽位：先存储地址到 0x00-0x13，然后 slot 到 0x14-0x33
             mstore(0x00, and(from, 0xffffffffffffffffffffffffffffffffffffffff))  // 清除高位，保留地址20字节
             mstore8(0x14, 0x00)  // 手动填充以确保正确布局（实际不需要）
-            mstore(0x20, _balances_slot)
+            mstore(0x20, BALANCES_SLOT)
             // 但为了简化，使用标准 32 字节对齐方式：
             mstore(0x00, from)           // 0x00-0x1F (32字节)
-            mstore(0x20, _balances_slot)  // 0x20-0x3F (32字节)
+            mstore(0x20, BALANCES_SLOT)  // 0x20-0x3F (32字节)
             let fromSlot := keccak256(0x00, 0x40)
 
             // to 槽位
             mstore(0x00, to)
-            mstore(0x20, _balances_slot)
+            mstore(0x20, BALANCES_SLOT)
             let toSlot := keccak256(0x00, 0x40)
 
             // 读取余额并检查
@@ -214,5 +214,24 @@ contract ProductionERC20 {
             totalSupply -= amount;
         }
         emit Transfer(account, address(0), amount);
+    }
+
+    // 公开的 burn 函数 - 燃烧调用者自己的代币
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+
+    // 公开的 burn 函数 - 燃烧指定账户的代币（需要授权）
+    function burnFrom(address account, uint256 amount) external {
+        uint256 currentAllowance = _allowances[account][msg.sender];
+        if (currentAllowance < amount) {
+            revert InsufficientAllowance(account, msg.sender, amount, currentAllowance);
+        }
+
+        unchecked {
+            _approve(account, msg.sender, currentAllowance - amount);
+        }
+
+        _burn(account, amount);
     }
 }
