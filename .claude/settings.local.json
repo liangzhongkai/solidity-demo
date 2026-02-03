@@ -18,7 +18,8 @@
       "Bash(npm run test:*)",
       "Bash(npm run compile:*)",
       "Bash(find:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx hardhat run:*)"
     ],
     "deny": [],
     "ask": []

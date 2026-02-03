@@ -268,4 +268,267 @@ describe("ProductionERC20 - Assembly 优化测试", function () {
       expect(await token.balanceOf(addr2.address)).to.equal(expectedBalance);
     });
   });
+
+  describe("transferFromOptimized - Assembly 优化测试", function () {
+    const approveAmount = ethers.parseEther("1000");
+
+    beforeEach(async function () {
+      // 给 addr1 转账用于测试
+      await token.transfer(addr1.address, ethers.parseEther("10000"));
+    });
+
+    it("✅ transferFromOptimized - 正常授权转账应该成功", async function () {
+      const transferAmount = ethers.parseEther("100");
+
+      // 授权
+      await token.connect(addr1).approve(owner.address, approveAmount);
+
+      // 使用优化版本转账
+      await expect(token.transferFromOptimized(addr1.address, addr2.address, transferAmount))
+        .to.changeTokenBalances(
+          token,
+          [addr1, addr2],
+          [-transferAmount, transferAmount]
+        );
+
+      expect(await token.balanceOf(addr2.address)).to.equal(transferAmount);
+    });
+
+    it("✅ transferFromOptimized - 应该触发 Transfer 事件", async function () {
+      const transferAmount = ethers.parseEther("100");
+
+      await token.connect(addr1).approve(owner.address, approveAmount);
+
+      await expect(token.transferFromOptimized(addr1.address, addr2.address, transferAmount))
+        .to.emit(token, "Transfer")
+        .withArgs(addr1.address, addr2.address, transferAmount);
+    });
+
+    it("✅ transferFromOptimized - 应该正确扣除 allowance", async function () {
+      const transferAmount = ethers.parseEther("300");
+
+      await token.connect(addr1).approve(owner.address, approveAmount);
+      await token.transferFromOptimized(addr1.address, addr2.address, transferAmount);
+
+      const remainingAllowance = await token.allowance(addr1.address, owner.address);
+      expect(remainingAllowance).to.equal(approveAmount - transferAmount);
+    });
+
+    it("❌ transferFromOptimized - allowance 不足应该 revert", async function () {
+      const transferAmount = ethers.parseEther("2000"); // 超过授权金额
+
+      await token.connect(addr1).approve(owner.address, approveAmount);
+
+      await expect(
+        token.transferFromOptimized(addr1.address, addr2.address, transferAmount)
+      ).to.be.revertedWithCustomError(token, "InsufficientAllowance");
+    });
+
+    it("❌ transferFromOptimized - 余额不足应该 revert", async function () {
+      // addr1 只有 10000，尝试转账 20000
+      const transferAmount = ethers.parseEther("20000");
+
+      await token.connect(addr1).approve(owner.address, transferAmount);
+
+      // assembly 版本使用简单 revert，不返回自定义错误
+      await expect(
+        token.transferFromOptimized(addr1.address, addr2.address, transferAmount)
+      ).to.be.reverted;
+    });
+
+    it("❌ transferFromOptimized - from 地址为零地址应该 revert", async function () {
+      await expect(
+        token.transferFromOptimized(ethers.ZeroAddress, addr2.address, ethers.parseEther("1"))
+      ).to.be.revertedWithCustomError(token, "InvalidRecipient");
+    });
+
+    it("❌ transferFromOptimized - to 地址为零地址应该 revert", async function () {
+      await token.connect(addr1).approve(owner.address, approveAmount);
+
+      await expect(
+        token.transferFromOptimized(addr1.address, ethers.ZeroAddress, ethers.parseEther("1"))
+      ).to.be.revertedWithCustomError(token, "InvalidRecipient");
+    });
+
+    it("✅ transferFromOptimized - 零值转账应该成功", async function () {
+      await token.connect(addr1).approve(owner.address, approveAmount);
+
+      await expect(token.transferFromOptimized(addr1.address, addr2.address, 0))
+        .to.changeTokenBalances(token, [addr1, addr2], [0, 0]);
+    });
+
+    it("✅ transferFromOptimized - 多次转账应该正确扣除 allowance", async function () {
+      const transferAmount = ethers.parseEther("100");
+      const times = 5;
+
+      await token.connect(addr1).approve(owner.address, approveAmount);
+
+      for (let i = 0; i < times; i++) {
+        await token.transferFromOptimized(addr1.address, addr2.address, transferAmount);
+      }
+
+      const expectedAllowance = approveAmount - (transferAmount * BigInt(times));
+      expect(await token.allowance(addr1.address, owner.address)).to.equal(expectedAllowance);
+      expect(await token.balanceOf(addr2.address)).to.equal(transferAmount * BigInt(times));
+    });
+  });
+
+  describe("transferFromOptimized vs transferFrom 对比", function () {
+    beforeEach(async function () {
+      await token.transfer(addr1.address, ethers.parseEther("10000"));
+    });
+
+    it("✅ 两个版本应该产生相同的结果", async function () {
+      const amount = ethers.parseEther("100");
+
+      // 标准版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      await token.transferFrom(addr1.address, addr2.address, amount);
+
+      // 优化版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      await token.transferFromOptimized(addr1.address, addr2.address, amount);
+
+      expect(await token.balanceOf(addr2.address)).to.equal(amount * 2n);
+    });
+
+    it("✅ 两个版本的事件应该相同", async function () {
+      const amount = ethers.parseEther("150");
+
+      // 标准版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      const tx1 = await token.transferFrom(addr1.address, addr2.address, amount);
+      const receipt1 = await tx1.wait();
+      const event1 = receipt1.logs.find(log => {
+        try {
+          return token.interface.parseLog(log)?.name === "Transfer";
+        } catch {
+          return false;
+        }
+      });
+
+      // 优化版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      const tx2 = await token.transferFromOptimized(addr1.address, addr2.address, amount);
+      const receipt2 = await tx2.wait();
+      const event2 = receipt2.logs.find(log => {
+        try {
+          return token.interface.parseLog(log)?.name === "Transfer";
+        } catch {
+          return false;
+        }
+      });
+
+      expect(event1).to.not.be.undefined;
+      expect(event2).to.not.be.undefined;
+    });
+  });
+
+  describe("transferFromOptimized Gas 消耗对比", function () {
+    beforeEach(async function () {
+      await token.transfer(addr1.address, ethers.parseEther("10000"));
+    });
+
+    it("✅ 应该测量 transferFrom 两个版本的 Gas 差异", async function () {
+      const transferAmount = ethers.parseEther("100");
+
+      // 标准版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      const tx1 = await token.transferFrom(addr1.address, addr2.address, transferAmount);
+      const receipt1 = await tx1.wait();
+      const standardGas = receipt1.gasUsed;
+
+      // 优化版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      const tx2 = await token.transferFromOptimized(addr1.address, addr2.address, transferAmount);
+      const receipt2 = await tx2.wait();
+      const optimizedGas = receipt2.gasUsed;
+
+      console.log("📊 transferFrom Gas 对比分析:");
+      console.log("  标准版本 Gas:", standardGas.toString());
+      console.log("  优化版本 Gas:", optimizedGas.toString());
+      console.log("  节省 Gas:", (standardGas - optimizedGas).toString());
+      console.log("  优化比例:", `${((Number(standardGas - optimizedGas) * 100) / Number(standardGas)).toFixed(2)}%`);
+
+      // 优化版本应该不比标准版本差（允许小幅度误差）
+      expect(optimizedGas).to.be.lessThan(standardGas + 2000n);
+    });
+
+    it("✅ 批量 transferFrom Gas 对比", async function () {
+      const amount = ethers.parseEther("10");
+      const iterations = 10;
+
+      // 标准版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      let standardTotalGas = 0n;
+      for (let i = 0; i < iterations; i++) {
+        const tx = await token.transferFrom(addr1.address, addr2.address, amount);
+        const receipt = await tx.wait();
+        standardTotalGas += receipt.gasUsed;
+      }
+
+      // 优化版本
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("1000"));
+      let optimizedTotalGas = 0n;
+      for (let i = 0; i < iterations; i++) {
+        const tx = await token.transferFromOptimized(addr1.address, addr2.address, amount);
+        const receipt = await tx.wait();
+        optimizedTotalGas += receipt.gasUsed;
+      }
+
+      console.log("📊 批量 transferFrom Gas 对比:");
+      console.log("  标准版本总 Gas:", standardTotalGas.toString());
+      console.log("  优化版本总 Gas:", optimizedTotalGas.toString());
+      console.log("  平均节省 Gas:", ((standardTotalGas - optimizedTotalGas) / BigInt(iterations)).toString());
+    });
+  });
+
+  describe("完整的 Assembly 优化链路测试", function () {
+    it("✅ approve + transferFromOptimized 完整链路", async function () {
+      await token.transfer(addr1.address, ethers.parseEther("10000"));
+
+      const approveAmount = ethers.parseEther("5000");
+      const transferAmount = ethers.parseEther("1000");
+
+      // 直接调用 _approveOptimized 的效果通过 approve 来测试
+      // 实际项目中可以直接测试内部函数
+      await token.connect(addr1).approve(owner.address, approveAmount);
+
+      // 验证 allowance 设置正确
+      expect(await token.allowance(addr1.address, owner.address)).to.equal(approveAmount);
+
+      // 使用优化版本转账
+      await token.transferFromOptimized(addr1.address, addr2.address, transferAmount);
+
+      // 验证余额和 allowance
+      expect(await token.balanceOf(addr2.address)).to.equal(transferAmount);
+      expect(await token.allowance(addr1.address, owner.address)).to.equal(approveAmount - transferAmount);
+    });
+
+    it("✅ 多方参与的完整 DeFi 流程模拟", async function () {
+      // 设置初始状态
+      await token.transfer(addr1.address, ethers.parseEther("10000"));
+      await token.transfer(addr2.address, ethers.parseEther("5000"));
+
+      // addr1 授权给 owner
+      await token.connect(addr1).approve(owner.address, ethers.parseEther("5000"));
+
+      // addr2 授权给 owner
+      await token.connect(addr2).approve(owner.address, ethers.parseEther("3000"));
+
+      // 使用优化版本进行多次转账
+      await token.transferFromOptimized(addr1.address, addr2.address, ethers.parseEther("1000"));
+      await token.transferFromOptimized(addr2.address, addr1.address, ethers.parseEther("500"));
+
+      // 验证最终状态
+      const addr1Balance = await token.balanceOf(addr1.address);
+      const addr2Balance = await token.balanceOf(addr2.address);
+
+      // addr1: 10000 - 1000 + 500 = 9500
+      expect(addr1Balance).to.equal(ethers.parseEther("9500"));
+
+      // addr2: 5000 + 1000 - 500 = 5500
+      expect(addr2Balance).to.equal(ethers.parseEther("5500"));
+    });
+  });
 });

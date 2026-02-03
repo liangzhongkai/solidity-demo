@@ -6,6 +6,7 @@
     "compile": "hardhat compile",
     "start": "hardhat node",
     "test": "hardhat test",
+    "scripts": "node scripts/examples/01-slot-packing/simple-demo.js && node scripts/examples/01-slot-packing/deployment-visualizer.js && node scripts/examples/02-erc20/deploy-demo.js && node scripts/examples/02-erc20/assembly-optimization-demo.js",
     "test:01": "hardhat test test/examples/01-slot-packing/PackingChallenge.test.js",
     "demo:01": "node scripts/examples/01-slot-packing/simple-demo.js",
     "visualize:01": "node scripts/examples/01-slot-packing/deployment-visualizer.js",

@@ -184,8 +184,69 @@ async function main() {
   console.log("✅ 成功 | Gas:", zeroReceipt.gasUsed.toString());
   console.log();
 
-  // 5. 功能正确性验证
-  console.log("✅ 5. 功能正确性验证");
+  // 5. transferFromOptimized 测试
+  console.log("🔗 5. transferFromOptimized - Assembly 优化授权转账测试");
+  console.log("─".repeat(50));
+
+  // 先从 addr2 转回一些余额给 deployer（因为前面的"最大金额转账"可能清空了 deployer）
+  const currentAddr2Balance = await token.balanceOf(addr2.address);
+  if (currentAddr2Balance > hre.ethers.parseEther("10000")) {
+    await token.connect(addr2).transfer(deployer.address, currentAddr2Balance - hre.ethers.parseEther("100"));
+  }
+
+  // 给 addr1 转账用于测试
+  const testFunding = hre.ethers.parseEther("10000");
+  console.log("📤 给 Addr1 转账 10000 tokens 用于测试...");
+  await token.transfer(addr1.address, testFunding);
+  console.log("✅ 转账完成");
+  console.log();
+
+  // 授权测试
+  const approveAmount = hre.ethers.parseEther("5000");
+  console.log("🔐 Addr1 授权 Deployer 5000 tokens...");
+  const approveTx = await token.connect(addr1).approve(deployer.address, approveAmount);
+  const approveReceipt = await approveTx.wait();
+  console.log("✅ 授权成功 | Gas:", approveReceipt.gasUsed.toString());
+
+  const allowance = await token.allowance(addr1.address, deployer.address);
+  console.log("📊 当前授权额度:", hre.ethers.formatEther(allowance), "tokens");
+  console.log();
+
+  // transferFrom 优化版本测试
+  const transferFromAmount = hre.ethers.parseEther("1000");
+  console.log("📤 使用 Assembly 优化版本从 Addr1 转账到 Addr2...");
+
+  // 先测试标准版本
+  const txStandardFrom = await token.transferFrom(addr1.address, addr2.address, transferFromAmount);
+  const receiptStandardFrom = await txStandardFrom.wait();
+  console.log("✅ 标准版本成功 | Gas:", receiptStandardFrom.gasUsed.toString());
+
+  // 重新授权
+  await token.connect(addr1).approve(deployer.address, approveAmount);
+
+  // 测试优化版本
+  const txOptimizedFrom = await token.transferFromOptimized(addr1.address, addr2.address, transferFromAmount);
+  const receiptOptimizedFrom = await txOptimizedFrom.wait();
+  console.log("✅ Assembly优化版本成功 | Gas:", receiptOptimizedFrom.gasUsed.toString());
+
+  const gasSavedFrom = receiptStandardFrom.gasUsed - receiptOptimizedFrom.gasUsed;
+  const percentSavedFrom = ((Number(gasSavedFrom) * 100) / Number(receiptStandardFrom.gasUsed)).toFixed(2);
+  console.log(`⛽ 节省 Gas: ${gasSavedFrom.toString()} (${percentSavedFrom}%)`);
+
+  // 验证余额和授权
+  const addr1FinalBalance = await token.balanceOf(addr1.address);
+  const addr2FinalBalance = await token.balanceOf(addr2.address);
+  const remainingAllowance = await token.allowance(addr1.address, deployer.address);
+
+  console.log();
+  console.log("📊 授权转账后状态:");
+  console.log("  Addr1 余额:", hre.ethers.formatEther(addr1FinalBalance), "tokens");
+  console.log("  Addr2 余额:", hre.ethers.formatEther(addr2FinalBalance), "tokens");
+  console.log("  剩余授权:", hre.ethers.formatEther(remainingAllowance), "tokens");
+  console.log();
+
+  // 6. 功能正确性验证
+  console.log("✅ 6. 功能正确性验证");
   console.log("─".repeat(50));
 
   // 重新获取余额
@@ -208,7 +269,7 @@ async function main() {
   console.log("  无代币丢失:", finalTotalSupply.toString() === hre.ethers.parseEther("1000000").toString() ? "✅" : "❌");
   console.log();
 
-  // 6. Assembly 优化总结
+  // 7. Assembly 优化总结
   console.log("🏆 Assembly 优化总结");
   console.log("─".repeat(50));
   console.log("✅ 优化亮点:");
