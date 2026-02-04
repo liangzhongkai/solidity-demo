@@ -24,7 +24,9 @@
       "Bash(pip3:*)",
       "Bash(slither:*)",
       "Bash(npm run slither:*)",
-      "Bash(npm run coverage:02:*)"
+      "Bash(npm run coverage:02:*)",
+      "Bash(grep:*)",
+      "Bash(npm run coverage:*)"
     ],
     "deny": [],
     "ask": []

@@ -16,7 +16,14 @@
     "test:02": "hardhat test test/examples/02-erc20/ProductionERC20.test.js",
     "test:02:assembly": "hardhat test test/examples/02-erc20/ProductionERC20-Assembly.test.js",
     "demo:02": "node scripts/examples/02-erc20/deploy-demo.js",
-    "demo:02:assembly": "node scripts/examples/02-erc20/assembly-optimization-demo.js"
+    "demo:02:assembly": "node scripts/examples/02-erc20/assembly-optimization-demo.js",
+    "test:03": "hardhat test test/examples/03-mapping-slot/MappingSlot.test.js",
+    "demo:03": "node scripts/examples/03-mapping-slot/demo.js",
+    "test:04": "hardhat test test/examples/04-proxy/Proxy.test.js",
+    "demo:04": "node scripts/examples/04-proxy/demo.js",
+    "test:05": "hardhat test test/examples/05-receive-fallback/ReceiveFallback.test.js",
+    "demo:05": "node scripts/examples/05-receive-fallback/demo.js",
+    "test:day2": "hardhat test test/examples/03-mapping-slot/MappingSlot.test.js test/examples/04-proxy/Proxy.test.js test/examples/05-receive-fallback/ReceiveFallback.test.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

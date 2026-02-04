@@ -15,13 +15,13 @@ contract ProductionERC20 {
     uint256 private constant BALANCES_SLOT = 3;     // _balances mapping 的存储槽位
 
     // State variables
-    string public name;
-    string public symbol;
-    uint8 public immutable decimals;
-    uint256 public totalSupply;
+    string public name; // slot 0
+    string public symbol; // slot 1
+    uint8 public immutable decimals; // 不占slot  calldata 存储
+    uint256 public totalSupply; // slot 2
 
-    mapping(address => uint256) private _balances;
-    mapping(address => mapping(address => uint256)) private _allowances;
+    mapping(address => uint256) private _balances; // slot 3
+    mapping(address => mapping(address => uint256)) private _allowances; // slot 4
 
     // Events with indexed parameters
     event Transfer(address indexed from, address indexed to, uint256 value);
@@ -154,14 +154,10 @@ contract ProductionERC20 {
             // === Assembly 优化实现 ===
             // keccak256(abi.encodePacked(address, slot))
             // abi.encodePacked 是紧凑编码：address(20字节) + slot(32字节) = 52字节
-
-            // from 槽位：先存储地址到 0x00-0x13，然后 slot 到 0x14-0x33
-            mstore(0x00, and(from, 0xffffffffffffffffffffffffffffffffffffffff))  // 清除高位，保留地址20字节
-            mstore8(0x14, 0x00)  // 手动填充以确保正确布局（实际不需要）
+            
+            // from 槽位 = keccak256(abi.encode(from, BALANCES_SLOT))
+            mstore(0x00, from)
             mstore(0x20, BALANCES_SLOT)
-            // 但为了简化，使用标准 32 字节对齐方式：
-            mstore(0x00, from)           // 0x00-0x1F (32字节)
-            mstore(0x20, BALANCES_SLOT)  // 0x20-0x3F (32字节)
             let fromSlot := keccak256(0x00, 0x40)
 
             // to 槽位
