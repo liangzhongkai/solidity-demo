@@ -581,22 +581,22 @@ describe("Proxy - delegatecall 机制", function () {
         await brokenProxy.getAddress()
       );
 
-      // BrokenCounter 的变量顺序：
-      // slot 3: count (原 V1 的 slot 3 是 count，OK)
-      // slot 4: owner (原 V1 的 slot 4 是 owner，但 V1 以为这是 count!)
+      // BrokenCounter 没有预留 slot 0、1，变量顺序与 V1 不同：
+      // BrokenCounter slot 0 = count  → 对应 Proxy slot 0（原是 impl），所以 count() 读到的是 impl 地址当数字！
+      // BrokenCounter slot 1 = owner  → 对应 Proxy slot 1（原是 admin）
+      // BrokenCounter slot 2 = lastUpdated → 对应 Proxy slot 2（原是 V1 的 count）
 
       const countAfter = await brokenIface.count();
       const ownerAfter = await brokenIface.owner();
 
       console.log("\n========== 升级后（错误布局）==========");
-      console.log("Count:", countAfter.toString());
-      console.log("Owner:", ownerAfter);
-      console.log("\n数据混乱了! Count 不再是 1");
+      console.log("Count (实际是 Proxy slot 0/impl 的值):", countAfter.toString());
+      console.log("Owner (实际是 Proxy slot 1/admin):", ownerAfter);
+      console.log("\n数据混乱了! Count 不再是 1，而是 impl 地址被当成 uint256");
       console.log("===============================\n");
 
-      // count 应该是 1，但由于布局改变，读取的是错误的 slot
-      // BrokenCounter 的 count 在 slot 3（与 V1 相同）
-      // 但如果我们调用 increment，会修改错误的 slot
+      // 验证数据混乱：升级前 count=1，升级后 BrokenCounter.count() 读的是 slot 0（impl），绝不是 1
+      expect(countAfter).to.not.equal(1);
     });
 
     it("应该演示 BrokenCounter.increment() 和 getVersion()", async function () {
@@ -623,19 +623,25 @@ describe("Proxy - delegatecall 机制", function () {
       const version = await brokenIface.getVersion.staticCall();
       expect(version).to.equal("BROKEN");
 
-      // 测试 increment()
+      const proxyAddress = await brokenProxy.getAddress();
+
+      // 先读 count()：BrokenCounter 的 count 在 slot 0，所以读到的是 Proxy 的 impl 地址（当 uint256）
+      const countBeforeIncrement = await brokenIface.count();
+      const slot0Before = await getStorageAt(proxyAddress, "0x0");
+      expect(countBeforeIncrement).to.equal(BigInt(slot0Before));
+
+      // 测试 increment() —— 会错误地给 slot 0（impl）加 1，破坏 proxy！
       await brokenIface.increment();
 
-      // 由于 storage 布局错误，直接调用 count() 可能失败
-      // 我们通过 storage 直接读取来验证
-      const proxyAddress = await brokenProxy.getAddress();
-      // BrokenCounter 的 count 在 slot 3
-      const slot3 = await getStorageAt(proxyAddress, "0x3");
-      const countFromStorage = BigInt(slot3);
+      // increment 后不能再调用 count()，因为 impl 已被破坏，delegatecall 会失败
+      // 直接用 getStorageAt 看 slot 0 被 +1 了
+      const slot0After = await getStorageAt(proxyAddress, "0x0");
+      expect(BigInt(slot0After)).to.equal(countBeforeIncrement + 1n);
 
       console.log("\n========== BrokenCounter 测试 ==========");
       console.log("Version:", version);
-      console.log("increment() 后 count (from slot 3):", countFromStorage.toString());
+      console.log("increment() 前 count() = slot 0 (impl):", countBeforeIncrement.toString());
+      console.log("increment() 后 slot 0 被 +1，impl 指针已破坏:", slot0After);
       console.log("========================================\n");
     });
   });

@@ -207,7 +207,11 @@ contract CounterV2 {
 
     // V2 新增：获取统计信息
     // 注意：不能使用 view，因为 delegatecall 与 staticcall 不兼容
-    function getStats() external view returns (uint256 _count, uint256 _totalOps, uint256 _lastUpdated) {
+    function getStats()
+        external
+        view
+        returns (uint256 _count, uint256 _totalOps, uint256 _lastUpdated)
+    {
         return (count, totalOperations, lastUpdated);
     }
 }
@@ -217,21 +221,21 @@ contract CounterV2 {
  * @notice 错误示例：storage 布局不兼容
  *
  * 这个合约演示了如果 storage 布局改变会发生什么
- * 这里把 count 移到了 slot 4，会导致数据混乱！
+ * 没有预留 slot 0、1 给 Proxy，且变量顺序与 V1 不一致，会导致数据混乱！
  */
 contract BrokenCounter {
-    // ⚠️ 错误！改变变量顺序会破坏 storage 兼容性
-    // slot 3 - 原 V1 的 owner 位置，现在是 count
+    // ⚠️ 错误！没有预留 slot 0、1，且变量顺序与 V1 不同
+    // 本合约 slot 0 -> 对应 Proxy slot 0（原是 impl），会破坏 proxy 的 impl 指针！
     uint256 public count;
 
-    // slot 4 - 原 V1 的 count 位置，现在是 owner
+    // 本合约 slot 1 -> 对应 Proxy slot 1（原是 admin）
     address public owner;
 
-    // V2 的 lastUpdated 位置...
+    // 本合约 slot 2 -> 对应 Proxy slot 2（原是 V1 的 count）
     uint256 public lastUpdated;
 
     function increment() external {
-        count += 1; // 实际上在修改 V1 的 owner 位置的 storage！
+        count += 1; // 实际写的是 Proxy 的 slot 0（impl），会破坏 proxy！
     }
 
     function getVersion() external pure returns (string memory) {
