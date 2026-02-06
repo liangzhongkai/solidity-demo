@@ -85,7 +85,7 @@ describe("ReceiveFallback - EVM 调用路由", function () {
       });
       await tx.wait();
 
-      const valueReceived = await demo.valueReceived();
+      const valueReceived = await demo.getValue();
       expect(valueReceived).to.equal(ethers.parseEther("0.5"));
     });
   });
@@ -337,7 +337,7 @@ describe("ReceiveFallback - EVM 调用路由", function () {
     });
   });
 
-  describe("任务 3.6: CallTarget 测试覆盖", function () {
+  describe("任务 3.5: CallTarget 测试覆盖", function () {
     it("应该演示 sendWithSend() 转账成功（使用简单地址）", async function () {
       // send() 和 transfer() 有 2300 gas 限制
       // 只有非常简单的 receive/fallback 才能成功
@@ -355,7 +355,7 @@ describe("ReceiveFallback - EVM 调用路由", function () {
       expect(user1Balance).to.be.greaterThan(0);
 
       console.log("\n========== sendWithSend() 成功 ==========");
-      console.log("成功向 EOA 转发 1 ETH");
+      console.log(`成功向 EOA 转发 ${ethers.formatEther(user1Balance)} ETH`);
       console.log("========================================\n");
     });
 
@@ -387,7 +387,7 @@ describe("ReceiveFallback - EVM 调用路由", function () {
       expect(user1Balance).to.be.greaterThan(0);
 
       console.log("\n========== transferWithTransfer() 成功 ==========");
-      console.log("成功向 EOA 转发 1 ETH");
+      console.log(`成功向 EOA 转发 ${ethers.formatEther(user1Balance)} ETH`);
       console.log("=================================================\n");
     });
 
@@ -580,7 +580,7 @@ describe("ReceiveFallback - EVM 调用路由", function () {
     });
   });
 
-  describe("任务 3.5: 完整的调用路由表", function () {
+  describe("任务 3.7: 完整的调用路由表", function () {
     it("应该打印完整的 EVM 调用路由决策树", async function () {
       console.log("\n===========================================");
       console.log("        EVM 调用路由决策树");

@@ -8,7 +8,7 @@
     "test": "hardhat test",
     "coverage": "hardhat coverage --testfiles \"test/examples/**/*.test.js\"",
     "coverage:02": "hardhat coverage --testfiles \"test/examples/02-erc20/*.test.js\"",
-    "slither": "slither contracts/examples/02-erc20/ProductionERC20.sol",
+    "slither": "slither . --exclude naming-convention,constable-states,immutable-states,unused-state,pragma,solc-version",
     "scripts": "node scripts/examples/01-slot-packing/simple-demo.js && node scripts/examples/01-slot-packing/deployment-visualizer.js && node scripts/examples/02-erc20/deploy-demo.js && node scripts/examples/02-erc20/assembly-optimization-demo.js",
     "test:01": "hardhat test test/examples/01-slot-packing/PackingChallenge.test.js",
     "demo:01": "node scripts/examples/01-slot-packing/simple-demo.js",
