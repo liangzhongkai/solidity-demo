@@ -58,6 +58,42 @@ describe("Proxy - delegatecall 机制", function () {
     );
   });
 
+  describe("Proxy 委托与升级", function () {
+    it("proxy delegates call", async function () {
+      // deploy logic, proxy (via beforeEach)
+      await counterInterface.initialize(owner.address);
+
+      // call proxy.someFunction() that exists in logic (increment)
+      await counterInterface.connect(user1).increment();
+
+      // Pure function: logic and proxy return same (same code executes via delegatecall)
+      expect(await counterV1.connect(user1).getVersion.staticCall()).to.equal(
+        await counterInterface.connect(user1).getVersion.staticCall()
+      );
+
+      // Verify proxy state was updated via delegation
+      expect(await counterInterface.getCount.staticCall()).to.equal(1);
+    });
+
+    it("proxy upgrade behavior", async function () {
+      await counterInterface.initialize(owner.address);
+      await counterInterface.connect(user1).increment();
+
+      const newImpl = await counterV2.getAddress();
+
+      await proxy.connect(owner).upgrade(newImpl);
+
+      expect(await proxy.impl()).to.equal(newImpl);
+
+      const counterV2Iface = await ethers.getContractAt(
+        "CounterV2",
+        await proxy.getAddress()
+      );
+      expect(await counterV2Iface.getCount.staticCall()).to.equal(1);
+      expect(await counterV2Iface.getVersion.staticCall()).to.equal("V2");
+    });
+  });
+
   describe("任务 2.1: 理解 delegatecall 的本质", function () {
     it("应该演示 storage 在 Proxy，逻辑在 impl", async function () {
       const proxyAddress = await proxy.getAddress();

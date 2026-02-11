@@ -21,8 +21,16 @@ contract Proxy {
     uint256 public constant PROXY_ID = 0x12345678;
 
     event Upgraded(address indexed oldImpl, address indexed newImpl);
+    event Upgrade(address indexed newImpl); // 简洁版：仅记录新实现地址，便于监听
     event DelegateCallFailed(bytes reason);
 
+    /**
+     * @notice 初始化 Proxy
+     * @param _impl 实现合约地址（逻辑合约）
+     * @param _admin 管理员地址（控制升级权限）
+     *
+     * 安全建议：构造器传入 implementation 地址，确保部署时即指向正确的逻辑合约
+     */
     constructor(address _impl, address _admin) {
         impl = _impl;
         admin = _admin;
@@ -41,6 +49,7 @@ contract Proxy {
         address oldImpl = impl;
         impl = newImpl;
         emit Upgraded(oldImpl, newImpl);
+        emit Upgrade(newImpl); // 补充：更简洁的事件，便于外部监听
     }
 
     /**
@@ -75,22 +84,19 @@ contract Proxy {
      * - 在当前合约的 storage 上执行代码
      * - msg.sender 保持为原始调用者
      * - msg.value 也保持不变
+     *
+     * 返回值：使用 assembly 正确返回 delegatecall 的返回数据，
+     * 失败时 revert 并携带 revert 原因。写法等价于 OpenZeppelin Proxy 核心逻辑。
      */
     function _delegate(address impl_) internal {
         assembly {
             // 复制 calldata 到 memory
             calldatacopy(0, 0, calldatasize())
 
-            // 执行 delegatecall
-            // gas(): 剩余 gas
-            // impl_: 目标合约地址
-            // 0: calldata 在 memory 中的起始位置
-            // calldatasize(): calldata 大小
-            // 0: 返回数据在 memory 中的起始位置
-            // 0: 返回数据大小（0 表示复制所有）
+            // 执行 delegatecall（等价于 OpenZeppelin Proxy 核心逻辑）
             let result := delegatecall(gas(), impl_, 0, calldatasize(), 0, 0)
 
-            // 复制返回数据到 memory
+            // 复制返回数据到 memory，确保正确返回 impl 的返回值
             returndatacopy(0, 0, returndatasize())
 
             // 根据结果决定返回或回滚
@@ -153,6 +159,7 @@ contract AdminUpgradeabilityProxy is Proxy {
         address oldImpl = impl;
         impl = newImpl;
         emit Upgraded(oldImpl, newImpl);
+        emit Upgrade(newImpl);
     }
 }
 

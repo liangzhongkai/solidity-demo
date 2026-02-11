@@ -4,6 +4,7 @@ artifacts/
 cache/
 typechain/
 typechain-types/
+gasReporterOutput.json
 
 # Coverage
 coverage/

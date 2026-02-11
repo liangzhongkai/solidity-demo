@@ -153,6 +153,39 @@ describe("ReceiveFallback - EVM 调用路由", function () {
       expect(fallbackCalled).to.be.true;
       expect(valueReceived).to.equal(ethers.parseEther("0.3"));
     });
+
+    it("send with empty calldata → receive()，余额 +1", async function () {
+      const demoAddress = await demo.getAddress();
+      await demo.resetFlags();
+
+      const balanceBefore = BigInt(await getBalance(demoAddress));
+
+      await owner.sendTransaction({
+        to: demoAddress,
+        value: ethers.parseEther("1")
+      });
+
+      const balanceAfter = BigInt(await getBalance(demoAddress));
+      expect(await demo.receiveCalled()).to.be.true;
+      expect(await demo.fallbackCalled()).to.be.false;
+      expect(balanceAfter).to.equal(balanceBefore + BigInt(ethers.parseEther("1")));
+    });
+
+    it("send with calldata → fallback() 而非 receive()", async function () {
+      const demoAddress = await demo.getAddress();
+      await demo.resetFlags();
+
+      await owner.sendTransaction({
+        to: demoAddress,
+        data: "0x1234",
+        value: ethers.parseEther("1")
+      });
+
+      expect(await demo.receiveCalled()).to.be.false;
+      expect(await demo.fallbackCalled()).to.be.true;
+      expect(await demo.lastCalldata()).to.equal("0x1234");
+      expect(await demo.valueReceived()).to.equal(ethers.parseEther("1"));
+    });
   });
 
   describe("任务 3.3: EVM 调用路由优先级", function () {

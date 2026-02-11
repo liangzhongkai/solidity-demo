@@ -6,8 +6,9 @@ async function getStorageAt(address, slot) {
   return await ethers.provider.send("eth_getStorageAt", [address, slot, "latest"]);
 }
 
-async function getBalance(address) {
-  return await ethers.provider.send("eth_getBalance", [address, "latest"]);
+// 格式化 uint256 为 storage 中的 32 字节 hex 格式（用于 expect 精确匹配）
+function toStorageHex(value) {
+  return ethers.toBeHex(BigInt(value), 32);
 }
 
 /**
@@ -34,6 +35,19 @@ describe("MappingSlot - 底层存储槽计算", function () {
   });
 
   describe("任务 1.1: 基础 mapping slot 计算", function () {
+    it("mapping slot computed correctly", async function () {
+      const slotIndex = 0; // balances mapping 在 slot 0
+      const testAmount = 12345;
+      await mappingSlot.setBalance(user1.address, testAmount);
+
+      const key = ethers.zeroPadValue(user1.address, 32);
+      const slot = ethers.keccak256(
+        ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "uint256"], [key, slotIndex])
+      );
+      const expectedValue = toStorageHex(testAmount);
+      expect(await getStorageAt(await mappingSlot.getAddress(), slot)).to.equal(expectedValue);
+    });
+
     it("应该演示 balances mapping (slot 0) 的 slot 计算", async function () {
       const contractAddress = await mappingSlot.getAddress();
 
@@ -66,16 +80,13 @@ describe("MappingSlot - 底层存储槽计算", function () {
       console.log("计算的 slot:", calculatedSlot);
       console.log("==========================================\n");
 
-      // 直接从 storage 读取，验证计算正确
-      const storageValue = await getStorageAt(contractAddress, calculatedSlot);
-      const parsedValue = BigInt(storageValue);
-
-      expect(parsedValue).to.equal(BigInt(testAmount));
-      expect(parsedValue).to.equal(BigInt(balanceViaGetter));
+      // 关键断言：用计算出的 slot 直接从 storage 读取，验证理解正确
+      const expectedValue = toStorageHex(testAmount);
+      expect(await getStorageAt(contractAddress, calculatedSlot)).to.equal(expectedValue);
 
       console.log("✅ 验证成功!");
       console.log("   - getter 返回值:", balanceViaGetter.toString());
-      console.log("   - storage 读取值:", parsedValue.toString());
+      console.log("   - expect(provider.getStorageAt(addr, computedSlot)).to.equal(expectedValue) ✓");
     });
 
     it("应该演示 getBalanceSlot() 函数", async function () {
@@ -106,8 +117,43 @@ describe("MappingSlot - 底层存储槽计算", function () {
       const testAmount = 99999;
       await mappingSlot.setBalance(user1.address, testAmount);
 
-      const storageValue = await getStorageAt(contractAddress, slotFromContract);
-      expect(BigInt(storageValue)).to.equal(BigInt(testAmount));
+      // 显式断言：computedSlot 与 storage 值一一对应
+      expect(await getStorageAt(contractAddress, slotFromContract)).to.equal(toStorageHex(testAmount));
+    });
+
+    it("应该对比不同 address 的 slot，验证 EVM 布局一致性", async function () {
+      const contractAddress = await mappingSlot.getAddress();
+      const mappingSlotNumber = 0; // balances 在 slot 0
+
+      // 为多个地址设置不同余额
+      const [addr1, addr2] = [user1.address, user2.address];
+      const [amount1, amount2] = [11111, 22222];
+      await mappingSlot.setBalance(addr1, amount1);
+      await mappingSlot.setBalance(addr2, amount2);
+
+      // 对每个 address：计算 slot = keccak256(abi.encode(key, mapping_slot))
+      const computeSlot = (addr) => {
+        const key = ethers.zeroPadValue(addr, 32);
+        return ethers.keccak256(
+          ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "uint256"], [key, mappingSlotNumber])
+        );
+      };
+
+      const slot1 = computeSlot(addr1);
+      const slot2 = computeSlot(addr2);
+
+      // 验证：不同 address → 不同 slot
+      expect(slot1).to.not.equal(slot2);
+
+      // 关键断言：expect(provider.getStorageAt(addr, computedSlot)).to.equal(expectedValue)
+      expect(await getStorageAt(contractAddress, slot1)).to.equal(toStorageHex(amount1));
+      expect(await getStorageAt(contractAddress, slot2)).to.equal(toStorageHex(amount2));
+
+      console.log("\n========== 多地址 Slot 对比验证 ==========");
+      console.log("addr1:", addr1, "→ slot:", slot1, "→ value:", amount1);
+      console.log("addr2:", addr2, "→ slot:", slot2, "→ value:", amount2);
+      console.log("公式 slot = keccak256(abi.encode(key, 0)) 对任意 address 均成立 ✓");
+      console.log("============================================\n");
     });
 
     it("应该演示 allowances mapping (slot 1) 的 slot 计算", async function () {
@@ -133,16 +179,14 @@ describe("MappingSlot - 底层存储槽计算", function () {
 
       expect(slotFromContract).to.equal(calculatedSlot);
 
+      // 关键断言：用计算出的 slot 读 storage
+      expect(await getStorageAt(contractAddress, calculatedSlot)).to.equal(toStorageHex(testAmount));
+
       console.log("\n========== Allowances Mapping Slot ==========");
       console.log("合约计算的 slot:", slotFromContract);
       console.log("手动计算的 slot:", calculatedSlot);
-      console.log("两者一致:", slotFromContract === calculatedSlot);
+      console.log(" expect(provider.getStorageAt(addr, computedSlot)).to.equal(expectedValue) ✓");
       console.log("=============================================\n");
-
-      // 验证 storage 值
-      const storageValue = await getStorageAt(contractAddress, calculatedSlot);
-      const parsedValue = BigInt(storageValue);
-      expect(parsedValue).to.equal(BigInt(testAmount));
     });
   });
 
@@ -193,10 +237,8 @@ describe("MappingSlot - 底层存储槽计算", function () {
 
       expect(slotFromContract).to.equal(finalSlot);
 
-      // 验证 storage 值
-      const storageValue = await getStorageAt(contractAddress, finalSlot);
-      const parsedValue = BigInt(storageValue);
-      expect(parsedValue).to.equal(BigInt(testAmount));
+      // 关键断言：nested mapping 的 slot 计算正确，storage 值一致
+      expect(await getStorageAt(contractAddress, finalSlot)).to.equal(toStorageHex(testAmount));
     });
   });
 
@@ -232,19 +274,20 @@ describe("MappingSlot - 底层存储槽计算", function () {
       const directRead = await mappingSlot.readDirectlyFromSlot(targetSlot);
       expect(directRead).to.equal(testValue);
 
-      // 方法3: 使用 provider.getStorageAt
-      const providerRead = await getStorageAt(contractAddress, targetSlot);
-      expect(BigInt(providerRead)).to.equal(BigInt(testValue));
+      // 方法3: 显式 assert - expect(provider.getStorageAt(addr, computedSlot)).to.equal(expectedValue)
+      expect(await getStorageAt(contractAddress, targetSlot)).to.equal(toStorageHex(testValue));
     });
   });
 
   describe("关键理解: 为什么 mapping 不能遍历", function () {
     it("应该演示 mapping 数据的稀疏存储特性", async function () {
+      const contractAddress = await mappingSlot.getAddress();
+
       // 设置两个不同地址的余额
       await mappingSlot.setBalance(user1.address, 1000);
       await mappingSlot.setBalance(user2.address, 2000);
 
-      // 计算各自的 slot
+      // 计算各自的 slot = keccak256(abi.encode(key, mapping_slot))
       const key1 = ethers.zeroPadValue(user1.address, 32);
       const slot1 = ethers.keccak256(
         ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "uint256"], [key1, 0])
@@ -255,33 +298,25 @@ describe("MappingSlot - 底层存储槽计算", function () {
         ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "uint256"], [key2, 0])
       );
 
+      // 关键断言：不同 address 对应不同 slot，各自 storage 值正确
+      expect(slot1).to.not.equal(slot2);
+      expect(await getStorageAt(contractAddress, slot1)).to.equal(toStorageHex(1000));
+      expect(await getStorageAt(contractAddress, slot2)).to.equal(toStorageHex(2000));
+
       console.log("\n========== Mapping 稀疏存储特性 ==========");
-      console.log("user1 slot:", slot1);
-      console.log("user2 slot:", slot2);
-      console.log("两个 slot 相邻吗?", slot1 == slot2);
-      console.log("slot 数值差距:", BigInt(slot2) - BigInt(slot1));
+      console.log("user1 slot:", slot1, "→ value: 1000");
+      console.log("user2 slot:", slot2, "→ value: 2000");
+      console.log("两个 slot 完全不同，且不相邻");
+      console.log(" expect(provider.getStorageAt(addr, computedSlot)).to.equal(expectedValue) ✓");
       console.log("===========================================\n");
 
-      // 两个地址的 slot 完全不同，且不相邻
-      // 这就是为什么 mapping 无法遍历：你不知道哪些 key 被使用了
-      expect(slot1).to.not.equal(slot2);
-
-      // 创建一个新的 mapping 合约实例来测试未使用的地址
-      const MappingSlot = await ethers.getContractFactory("MappingSlot");
-      const freshMappingSlot = await MappingSlot.deploy();
-      await freshMappingSlot.waitForDeployment();
-
-      // 使用一个从未设置过的地址
+      // 未使用的 address：computedSlot 对应 storage 为 0
       const [_, __, randomUser] = await ethers.getSigners();
       const key3 = ethers.zeroPadValue(randomUser.address, 32);
       const slot3 = ethers.keccak256(
         ethers.AbiCoder.defaultAbiCoder().encode(["bytes32", "uint256"], [key3, 0])
       );
-      const value = await getStorageAt(
-        await freshMappingSlot.getAddress(),
-        slot3
-      );
-      expect(BigInt(value)).to.equal(0n);
+      expect(await getStorageAt(contractAddress, slot3)).to.equal(toStorageHex(0));
     });
   });
 });
